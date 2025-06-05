@@ -1,0 +1,11 @@
+streamlit
+pandas
+plotly
+numpy
+pymannkendall
+numpy 
+pandas
+matplotlib
+tensorflow
+scikit-learn
+statsmodels
