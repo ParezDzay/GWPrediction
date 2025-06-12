@@ -13,10 +13,10 @@ page = st.sidebar.radio(
     ["Home", "Well Map Viewer", "📈 Groundwater Data", "📉 Groundwater Level Trends for Wells", "📊 Groundwater Prediction"]
 )
 
-file_path = r"Wells detailed data.csv" 
-gw_file_path = r"GW data.csv"
-output_path = r"GW data (missing filled).csv"
-cleaned_outlier_path = r"GW data (missing filled).csv"
+file_path = r"C:\Parez\Wells detailed data.csv"
+gw_file_path = r"C:\Parez\GW data.csv"
+output_path = r"C:\Parez\GW data (missing filled).csv"
+cleaned_outlier_path = r"C:\Parez\GW data (missing filled).csv"
 
 # ──────────────── LOAD WELL DATA ────────────────
 if page not in ["📈 Groundwater Data", "📉 Groundwater Level Trends for Wells"]:
@@ -345,123 +345,21 @@ elif page == "📉 Groundwater Level Trends for Wells":
 
 # ──────────────── GROUNDWATER PREDICTION ────────────────
 elif page == "📊 Groundwater Prediction":
-    import numpy as np
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import tensorflow as tf
-    from tensorflow.keras.models import Sequential
-    from tensorflow.keras.layers import Dense
-    from sklearn.preprocessing import MinMaxScaler
-    from sklearn.metrics import mean_squared_error
-    from statsmodels.tsa.arima.model import ARIMA
-
     st.title("📊 Groundwater Prediction Models")
     tab1, tab2 = st.tabs(["🔮 ANN Prediction", "📉 ARIMA"])
 
-    @st.cache_data
-    def load_gw_data():
-        if not os.path.exists(cleaned_outlier_path):
-            st.error("Cleaned groundwater data CSV not found.")
-            return None
-        data = pd.read_csv(cleaned_outlier_path)
-        data["Date"] = pd.to_datetime(data["Year"].astype(str) + "-" + data["Months"].astype(str) + "-01", format="%Y-%m-%d")
-        data.set_index("Date", inplace=True)
-        return data
-
-    gw_data = load_gw_data()
-    if gw_data is None:
-        st.stop()
-
-    wells = [col for col in gw_data.columns if col not in ["Year", "Months"]]
-
-    def prepare_ann_data(series, n_steps=12):
-        """Prepare supervised data for ANN with lag features"""
-        X, y = [], []
-        for i in range(len(series) - n_steps):
-            X.append(series[i:i+n_steps])
-            y.append(series[i+n_steps])
-        return np.array(X), np.array(y)
-
     with tab1:
-        st.subheader("Artificial Neural Network (ANN) Prediction")
-
-        selected_well = st.selectbox("Select Well for ANN Prediction", wells)
-        n_steps = st.slider("Number of Lag Months (Input window size)", min_value=6, max_value=24, value=12)
-
-        series = gw_data[selected_well].dropna().values.reshape(-1, 1)
-
-        # Scaling data
-        scaler = MinMaxScaler(feature_range=(0, 1))
-        series_scaled = scaler.fit_transform(series)
-
-        X, y = prepare_ann_data(series_scaled.flatten(), n_steps)
-
-        # Split train/test
-        train_size = int(len(X) * 0.8)
-        X_train, X_test = X[:train_size], X[train_size:]
-        y_train, y_test = y[:train_size], y[train_size:]
-
-        # Build ANN model
-        model = Sequential([
-            Dense(50, activation='relu', input_shape=(n_steps,)),
-            Dense(25, activation='relu'),
-            Dense(1)
-        ])
-        model.compile(optimizer='adam', loss='mse')
-
-        if st.button("Train ANN Model"):
-            with st.spinner("Training ANN model..."):
-                model.fit(X_train, y_train, epochs=100, verbose=0)
-                st.success("Training completed.")
-
-                # Predict
-                y_pred = model.predict(X_test).flatten()
-                y_pred_rescaled = scaler.inverse_transform(y_pred.reshape(-1,1)).flatten()
-                y_test_rescaled = scaler.inverse_transform(y_test.reshape(-1,1)).flatten()
-
-                mse = mean_squared_error(y_test_rescaled, y_pred_rescaled)
-                st.write(f"Test MSE: {mse:.4f}")
-
-                # Plot results
-                plt.figure(figsize=(10,4))
-                plt.plot(y_test_rescaled, label='Actual')
-                plt.plot(y_pred_rescaled, label='Predicted')
-                plt.title(f"ANN Prediction for {selected_well}")
-                plt.xlabel("Time Step")
-                plt.ylabel("Groundwater Level")
-                plt.legend()
-                st.pyplot(plt)
+        st.subheader("Artificial Neural Network (ANN) Groundwater Prediction")
+        st.markdown("""
+        - This section will use ANN models to predict groundwater levels based on climate variables.
+        - Configure model inputs and view prediction plots here.
+        """)
+        st.info("ANN prediction logic not implemented yet.")
 
     with tab2:
-        st.subheader("ARIMA Prediction")
-
-        selected_well_arima = st.selectbox("Select Well for ARIMA Prediction", wells, key="arima_well")
-        p = st.number_input("AR order (p)", min_value=0, max_value=5, value=1)
-        d = st.number_input("Difference order (d)", min_value=0, max_value=2, value=1)
-        q = st.number_input("MA order (q)", min_value=0, max_value=5, value=1)
-
-        series_arima = gw_data[selected_well_arima].dropna()
-
-        if st.button("Run ARIMA Model"):
-            with st.spinner("Fitting ARIMA model..."):
-                try:
-                    model_arima = ARIMA(series_arima, order=(p,d,q))
-                    model_fit = model_arima.fit()
-                    forecast = model_fit.forecast(steps=12)
-
-                    # Plot historical and forecast
-                    plt.figure(figsize=(10,4))
-                    plt.plot(series_arima.index, series_arima.values, label='Historical')
-                    future_index = pd.date_range(series_arima.index[-1] + pd.offsets.MonthBegin(),
-                                                 periods=12, freq='MS')
-                    plt.plot(future_index, forecast, label='Forecast', linestyle='--')
-                    plt.title(f"ARIMA Forecast for {selected_well_arima}")
-                    plt.xlabel("Date")
-                    plt.ylabel("Groundwater Level")
-                    plt.legend()
-                    st.pyplot(plt)
-
-                    st.write(forecast)
-
-                except Exception as e:
-                    st.error(f"ARIMA model failed: {e}")
+        st.subheader("ARIMA Time Series Groundwater Prediction")
+        st.markdown("""
+        - This section will use ARIMA models to forecast groundwater levels based on time series trends.
+        - ARIMA configuration and visual outputs will be displayed here.
+        """)
+        st.info("ARIMA prediction logic not implemented yet.")
